@@ -1,0 +1,68 @@
+# Main experiment: real EIA data, Jev vs an LLM-as-classifier, with rules and climatology
+# as reference arms. Paths are relative to the repository root.
+
+run_name: wpsr-v1
+questions: configs/questions.yaml
+
+data:
+  source: eia                       # eia | synthetic
+  dir: data                         # raw/ and processed/ live under here
+  history_start: "2015-01-01"       # label history used by the climatology baseline
+  eval_start: "2022-01-07"          # first report week that is scored
+  eval_end: null                    # null = latest available
+  # State views (see README "State views"). Add wpsr_text once data/raw/wpsr_text/ is populated.
+  views: [with_changes, levels_only]
+  unit_style: mixed                 # mixed | million | thousand
+  anonymize_dates: true             # strip dates from state text (limits look-up of memorized history)
+  seed: 7
+
+eia:
+  base_url: https://api.eia.gov/v2
+  api_key_env: EIA_API_KEY
+  # Legacy v1 series IDs, fetched through the v2 /seriesid/ compatibility route.
+  series:
+    crude:         { id: PET.WCESTUS1.W,              units: kbbl,    name: "U.S. commercial crude oil inventories (excl. SPR)" }
+    gasoline:      { id: PET.WGTSTUS1.W,              units: kbbl,    name: "U.S. total motor gasoline inventories" }
+    distillate:    { id: PET.WDISTUS1.W,              units: kbbl,    name: "U.S. distillate fuel oil inventories" }
+    cushing:       { id: PET.W_EPC0_SAX_YCUOK_MBBL.W, units: kbbl,    name: "Cushing, OK crude oil inventories (excl. SPR)" }
+    refinery_util: { id: PET.WPULEUS3.W,              units: percent, name: "U.S. refinery utilization (% of operable capacity)" }
+
+arms:
+  jev:
+    kind: jev
+    model: jev-latest               # pin a concrete model id for reproducible reruns
+    max_concurrency: 4
+    # USD per 1M tokens. Listed at launch (Sep 2026) as $0.04 input / free output; verify.
+    price_per_mtok: { input: 0.04, output: 0.0 }
+
+  llm_sonnet:
+    kind: llm
+    model: anthropic:claude-sonnet-5-5   # any LangChain init_chat_model string
+    structured_method: json_schema     # this model does not support forced tool calling
+    max_concurrency: 4
+    # temperature: 0                  # uncomment if the model accepts it
+    price_per_mtok: { input: null, output: null }   # fill in from the provider's pricing page
+
+  llm_openai:
+    kind: llm
+    enabled: false
+    model: openai:gpt-5.6-luna
+    max_concurrency: 4
+    price_per_mtok: { input: null, output: null }
+
+  rules:
+    kind: rules
+    eps: 0.01                        # probability mass kept off the parsed answer
+
+  climatology:
+    kind: climatology
+    alpha: 1.0                       # Laplace / Dirichlet smoothing
+    seasonal_halfwidth: null         # e.g. 4 -> only use history within +/-4 weeks of the same week-of-year
+
+evaluation:
+  n_bins: 10
+  bootstrap_n: 2000
+  bootstrap_seed: 11
+  recal_folds: 5
+  primary_pair: [jev, llm_sonnet]
+  reference_arm: climatology

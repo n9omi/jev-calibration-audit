@@ -1,0 +1,49 @@
+[build-system]
+requires = ["hatchling>=1.24"]
+build-backend = "hatchling.build"
+
+[project]
+name = "jev-calibration-audit"
+version = "0.1.0"
+description = "Independent calibration audit of TypeSafe AI's Jev on U.S. petroleum inventory reports, run through LangChain."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Naomi Tinga" }]
+keywords = ["calibration", "forecast-verification", "langchain", "typesafe", "jev", "eia", "commodities"]
+dependencies = [
+  "numpy>=1.26",
+  "pandas>=2.2",
+  "scipy>=1.11",
+  "scikit-learn>=1.4",
+  "matplotlib>=3.8",
+  "pydantic>=2.6",
+  "pyyaml>=6.0",
+  "requests>=2.31",
+  "python-dotenv>=1.0",
+  "langchain-core>=1.6.2",
+]
+
+[project.optional-dependencies]
+# Jev arm (TypeSafe's LangChain integration is a pre-release package).
+jev = ["langchain-typesafe>=0.0.1a3"]
+# LLM-as-classifier arm. Install the provider package for the model you configure.
+llm = ["langchain>=1.3", "langchain-anthropic", "langchain-openai"]
+dev = ["pytest>=8", "ruff>=0.6", "langchain-typesafe>=0.0.1a3", "langchain>=1.3"]
+
+[project.scripts]
+jev-audit = "jev_audit.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/jev_audit"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]

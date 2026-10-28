@@ -1,0 +1,119 @@
+# Question bank for the calibration audit.
+#
+# Every arm (Jev, the LLM baseline, the rules baseline) receives the same instructions and
+# criteria, word for word. Changing anything here changes the question-set fingerprint, which
+# invalidates cached predictions so old and new wordings are never scored together.
+#
+# horizon = label.lead
+#   0 -> the answer is determined by this week's report (extraction / arithmetic)
+#   1 -> the answer is in NEXT week's report (a genuine forecast)
+#
+# Units: inventory bucket edges are in thousand barrels (kbbl); utilization edges in percent.
+# Bucket semantics (labels.py): level i means edges[i-1] <= x < edges[i].
+
+version: 1
+
+questions:
+  # ---------------------------------------------------------------- horizon 0
+  crude_draw:
+    type: noul
+    instructions: >-
+      U.S. commercial crude oil inventories (excluding the Strategic Petroleum Reserve)
+      decreased from the previous week.
+    criteria:
+      true: Commercial crude oil inventories fell week over week.
+      false: Commercial crude oil inventories rose or were unchanged week over week.
+    label: { fn: draw, series: crude, lead: 0 }
+
+  gasoline_draw:
+    type: noul
+    instructions: Total U.S. motor gasoline inventories decreased from the previous week.
+    criteria:
+      true: Gasoline inventories fell week over week.
+      false: Gasoline inventories rose or were unchanged week over week.
+    label: { fn: draw, series: gasoline, lead: 0 }
+
+  distillate_draw:
+    type: noul
+    instructions: U.S. distillate fuel inventories decreased from the previous week.
+    criteria:
+      true: Distillate inventories fell week over week.
+      false: Distillate inventories rose or were unchanged week over week.
+    label: { fn: draw, series: distillate, lead: 0 }
+
+  cushing_draw:
+    type: noul
+    instructions: Crude oil inventories at Cushing, Oklahoma decreased from the previous week.
+    criteria:
+      true: Cushing crude inventories fell week over week.
+      false: Cushing crude inventories rose or were unchanged week over week.
+    label: { fn: draw, series: cushing, lead: 0 }
+
+  crude_change_bucket:
+    type: score
+    instructions: >-
+      How large was this week's change in U.S. commercial crude oil inventories
+      (excluding the Strategic Petroleum Reserve)?
+    criteria:
+      - Draw of more than 5 million barrels
+      - Draw of 1 to 5 million barrels
+      - Change smaller than 1 million barrels in either direction
+      - Build of 1 to 5 million barrels
+      - Build of more than 5 million barrels
+    label: { fn: bucket, series: crude, transform: diff, lead: 0, edges: [-5000, -1000, 1000, 5000] }
+
+  refinery_util_bucket:
+    type: score
+    instructions: >-
+      What was U.S. refinery utilization this week, as a percent of operable capacity?
+    criteria:
+      - Below 85%
+      - 85% to below 90%
+      - 90% to below 95%
+      - 95% or higher
+    label: { fn: bucket, series: refinery_util, transform: level, lead: 0, edges: [85, 90, 95] }
+
+  largest_pct_mover:
+    type: choice
+    instructions: >-
+      Which product's inventories changed the most in percentage terms from the previous
+      week, regardless of direction?
+    criteria:
+      crude: U.S. commercial crude oil inventories (excluding the SPR)
+      gasoline: Total motor gasoline inventories
+      distillate: Distillate fuel inventories
+    label: { fn: argmax_abs_pct_change, series: [crude, gasoline, distillate], lead: 0 }
+
+  # ---------------------------------------------------------------- horizon 1
+  next_crude_draw:
+    type: noul
+    instructions: >-
+      Next week's EIA report will show U.S. commercial crude oil inventories (excluding the
+      Strategic Petroleum Reserve) decreasing from this week's level.
+    criteria:
+      true: Next week's report shows a crude inventory draw.
+      false: Next week's report shows a crude inventory build or no change.
+    label: { fn: draw, series: crude, lead: 1 }
+
+  next_gasoline_draw:
+    type: noul
+    instructions: >-
+      Next week's EIA report will show total U.S. motor gasoline inventories decreasing from
+      this week's level.
+    criteria:
+      true: Next week's report shows a gasoline inventory draw.
+      false: Next week's report shows a gasoline inventory build or no change.
+    label: { fn: draw, series: gasoline, lead: 1 }
+
+  next_crude_bucket:
+    type: score
+    instructions: >-
+      How large will next week's change in U.S. commercial crude oil inventories (excluding
+      the Strategic Petroleum Reserve) be?
+    criteria:
+      - Draw of more than 5 million barrels
+      - Draw of 1 to 5 million barrels
+      - Change smaller than 1 million barrels in either direction
+      - Build of 1 to 5 million barrels
+      - Build of more than 5 million barrels
+    label: { fn: bucket, series: crude, transform: diff, lead: 1, edges: [-5000, -1000, 1000, 5000] }
